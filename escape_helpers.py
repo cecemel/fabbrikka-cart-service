@@ -1,6 +1,7 @@
 import datetime
 import re
 
+
 def sparql_escape(obj):
     if type(obj) is str:
         def replacer(a):

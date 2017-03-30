@@ -1,9 +1,6 @@
 import uuid
 import datetime
-import logging
 import os
-import sys
-from main import graph
 from flask import jsonify
 from rdflib.namespace import DC
 from escape_helpers import sparql_escape
@@ -11,37 +8,17 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 
 
 def generate_uuid():
-    """Generates a unique user id based the host ID and current time"""
+    """Fenerates a unique user id based the host ID and current time"""
     return str(uuid.uuid1())
 
 
-log_levels = {'DEBUG': logging.DEBUG,
-              'INFO': logging.INFO,
-              'WARNING': logging.WARNING,
-              'ERROR': logging.ERROR,
-              'CRITICAL': logging.CRITICAL}
-log_dir = '/logs'
-if not os.path.exists(log_dir): os.makedirs(log_dir)
-thelogger = logging.getLogger('')
-thelogger.setLevel(log_levels.get(os.environ.get('LOG_LEVEL').upper()))
-fileHandler = logging.FileHandler("{0}/{1}.log".format(log_dir, 'logs'))
-thelogger.addHandler(fileHandler)
-consoleHandler = logging.StreamHandler(stream=sys.stdout)# or stderr?
-thelogger.addHandler(consoleHandler)
-
-def log(msg):
-    """write a log message to the log file. Logs are written to the `/logs`
-     directory in the docker container."""
-    thelogger.info(msg)
-
-
 def session_id_header(request):
-    """returns the HTTP_MU_SESSION_ID header from the given request"""
+    """Returns the HTTP_MU_SESSION_ID header from the given request"""
     return request.args.get('HTTP_MU_SESSION_ID')
 
 
 def rewrite_url_header(request):
-    """return the HTTP_X_REWRTITE_URL header from the given request"""
+    """Return the HTTP_X_REWRTITE_URL header from the given request"""
     return request.args.get('HTTP_X_REWRITE_URL')
 
 
@@ -67,27 +44,31 @@ def validate_resource_type(expected_type, data):
                      ", instead of " + str(data['type']) + ".", 409)
 
 
-sparqlQuery = SPARQLWrapper(os.environ.get('MU_SPARQL_ENDPOINT'), returnFormat=JSON)
-sparqlUpdate = SPARQLWrapper(os.environ.get('MU_SPARQL_UPDATEPOINT'), returnFormat=JSON)
-sparqlUpdate.method = 'POST'
+def init_sparql_wrapper(config):
+    sparql_query = SPARQLWrapper(config['MU_SPARQL_ENDPOINT'], returnFormat=JSON)
+    sparql_update = SPARQLWrapper(config['MU_SPARQL_UPDATEPOINT'], returnFormat=JSON)
+    sparql_update.method = 'POST'
+    return {"sparql_query": sparql_query, "sparql_update": sparql_update}
 
-def query(the_query):
-    """Execute the given SPARQL query (select/ask/construct)on the tripple store and returns the results
+
+def query(logger, sparql_query, the_query):
+    """Execute the given SPARQL query (select/ask/construct)on the triple store and returns the results
     in the given returnFormat (JSON by default)."""
-    log("execute query: \n" + the_query)
-    sparqlQuery.setQuery(the_query)
-    return sparqlQuery.query().convert()
+    logger.info("execute query: \n" + the_query)
+    sparql_query.setQuery(the_query)
+    return sparql_query.query().convert()
 
 
-def update(the_query):
+def update(logger, sparql_update, the_query):
     """Execute the given update SPARQL query on the tripple store,
     if the given query is no update query, nothing happens."""
-    sparqlUpdate.setQuery(the_query)
-    if sparqlUpdate.isSparqlUpdateRequest():
-        sparqlUpdate.query()
+    logger.info("execute query: \n" + the_query)
+    sparql_update.setQuery(the_query)
+    if sparql_update.isSparqlUpdateRequest():
+        sparql_update.query()
 
 
-def update_modified(subject, modified=datetime.datetime.now()):
+def update_modified(logger, sparql_update, graph, subject, modified=datetime.datetime.now()):
     """Executes a SPARQL query to update the modification date of the given subject URI (string).
      The default date is now."""
     query = " WITH <%s> " % graph
@@ -97,14 +78,14 @@ def update_modified(subject, modified=datetime.datetime.now()):
     query += " WHERE {"
     query += "   <%s> <%s> %s ." % (subject, DC.Modified, sparql_escape(modified))
     query += " }"
-    update(query)
+    update(logger, sparql_update, query)
 
     query = " INSERT DATA {"
     query += "   GRAPH <%s> {" % graph
     query += "     <%s> <%s> %s ." % (subject, DC.Modified, sparql_escape(modified))
     query += "   }"
     query += " }"
-    update(query)
+    update(logger, sparql_update, query)
 
 
 def verify_string_parameter(parameter):

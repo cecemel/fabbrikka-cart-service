@@ -1,51 +1,59 @@
-import flask
-import os
+from flask import Flask, request, jsonify
+import os, sys
 import helpers
-import __builtin__
-from escape_helpers import sparql_escape
+import logging
+import config
+
 from rdflib.namespace import Namespace
 
-app = flask.Flask(__name__)
+##############
+# INIT CONFIG
+##############
+CONFIG = config.load_config(os.environ.get('ENVIRONMENT', "DEBUG"))
+app = Flask(__name__)
 
-####################
-## Example method ##
-####################
+handler = logging.StreamHandler(stream=sys.stdout)
+handler.setLevel(CONFIG["LOG_LEVEL"])
+app.logger.addHandler(handler)
 
-@app.route('/templateExample/')
-def query():
-    """Example query: Returns all the triples in the application graph in a JSON
-    format."""
-    q =  " SELECT *"
-    q += " WHERE{"
-    q += "   GRAPH <http://mu.semte.ch/application> {"
-    q += "     ?s ?p ?o"
-    q += "   }"
-    q += " }"
-    return flask.jsonify(helpers.query(q))
-
-##################
-## Vocabularies ##
-##################
+# vocabularies
 mu = Namespace('http://mu.semte.ch/vocabularies/')
 mu_core = Namespace('http://mu.semte.ch/vocabularies/core/')
 mu_ext = Namespace('http://mu.semte.ch/vocabularies/ext/')
 
-graph = os.environ.get('MU_APPLICATION_GRAPH')
-SERVICE_RESOURCE_BASE = 'http://mu.semte.ch/services/'
+graph = CONFIG['MU_APPLICATION_GRAPH']
+
+# sparql wrapper
+sparql_wrapper = helpers.init_sparql_wrapper(CONFIG)
+
+
+#################
+# Example method
+#################
+@app.route('/carts', methods=["POST"])
+def associate_cart():
+    """
+    associates cart with mu-session
+    :return:
+    """
+    session_id = helpers.session_id_header(request)
+    return jsonify(session_id)
+    # q = " SELECT *"
+    # q += " WHERE{"
+    # q += "   GRAPH <http://mu.semte.ch/application> {"
+    # q += "     ?s ?p ?o"
+    # q += "   }"
+    # q += " }"
+    # return jsonify(helpers.query(app.logger, sparql_wrapper["sparql_query"], q))
+
+
+@app.route('/carts')
+def return_associate_cart():
+    print("todo")
 
 #######################
 ## Start Application ##
 #######################
 if __name__ == '__main__':
-    __builtin__.app = app
-    __builtin__.helpers = helpers
-    __builtin__.sparql_escape = sparql_escape
-    app_file = os.environ.get('APP_ENTRYPOINT')
-    f = open('/app/__init__.py', 'w+')
-    f.close()
-    try:
-        exec "from ext.app.%s import *" % app_file
-    except Exception as e:
-        helpers.log(str(e))
-    debug = True if (os.environ.get('MODE') == "development") else False
-    app.run(debug=debug, host='0.0.0.0', port=80)
+    app.logger.info("---cart-service is starting")
+    app.run(host='0.0.0.0', port=8091)
