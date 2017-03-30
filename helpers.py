@@ -3,7 +3,7 @@ import datetime
 import logging
 import os
 import sys
-from web import graph
+from main import graph
 from flask import jsonify
 from rdflib.namespace import DC
 from escape_helpers import sparql_escape
