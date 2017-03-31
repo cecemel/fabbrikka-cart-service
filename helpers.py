@@ -14,12 +14,12 @@ def generate_uuid():
 
 def session_id_header(request):
     """Returns the HTTP_MU_SESSION_ID header from the given request"""
-    return request.args.get('HTTP_MU_SESSION_ID')
+    return request.headers.get('MU_SESSION_ID')
 
 
 def rewrite_url_header(request):
     """Return the HTTP_X_REWRTITE_URL header from the given request"""
-    return request.args.get('HTTP_X_REWRITE_URL')
+    return request.headers.get('HTTP_X_REWRITE_URL')
 
 
 def error(msg, status=400):
@@ -31,15 +31,15 @@ def error(msg, status=400):
 
 def validate_json_api_content_type(request):
     """Validate whether the content type of the request is application/vnd.api+json."""
-    if "/^application/vnd.api+json" not in request.args.get('CONTENT_TYPE'):
+    if "application/vnd.api+json" not in request.headers.get('Content-Type'):
         return error("Content-Type must be application/vnd.api+json instead of" +
-                     request.args.get('CONTENT_TYPE'))
+                     request.headers.get('Content-Type'))
 
 
 def validate_resource_type(expected_type, data):
     """Validate whether the type specified in the JSON data is equal to the expected type.
     Returns a `409` otherwise."""
-    if data['type'] is not expected_type:
+    if not data['type'] == expected_type:
         return error("Incorrect type. Type must be " + str(expected_type) +
                      ", instead of " + str(data['type']) + ".", 409)
 
@@ -60,7 +60,7 @@ def query(logger, sparql_query, the_query):
 
 
 def update(logger, sparql_update, the_query):
-    """Execute the given update SPARQL query on the tripple store,
+    """Execute the given update SPARQL query on the triple store,
     if the given query is no update query, nothing happens."""
     logger.info("execute query: \n" + the_query)
     sparql_update.setQuery(the_query)
