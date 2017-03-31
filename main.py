@@ -113,4 +113,4 @@ def return_associate_cart():
 #######################
 if __name__ == '__main__':
     app.logger.info("---cart-service is starting")
-    app.run(host='0.0.0.0', port=8091, debug=True)
+    app.run(host='0.0.0.0', port=80, debug=True)
